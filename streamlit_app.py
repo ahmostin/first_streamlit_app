@@ -1,6 +1,7 @@
 import streamlit
-import pandas
+import pandas as pd
 from snowflake.snowpark import Session
+import numpy as np
 from PIL import Image
 streamlit.set_page_config(page_title="Portfolio Viewer",layout="wide")
 
@@ -64,21 +65,21 @@ stmt = '''select
     TICKER as "Ticker",
     ISIN,
     CURRENCY_CODE as "Currency",
-    COUNTRY_OF_DOMICILE as "Country_CD",
-    COUNTRY_NAME,
-    REGION,   
-    GICS_SECTOR_LEVEL1,
-    GICS_SECTOR_LEVEL2,
-    GICS_SECTOR_LEVEL3,
-    GICS_SECTOR_LEVEL4,
-    ASSET_CLASS_LEVEL1,
-    ASSET_CLASS_LEVEL2,
-    ASSET_CLASS_LEVEL3,
+    COUNTRY_OF_DOMICILE as "Country CD",
+    COUNTRY_NAME as "Country",
+    REGION as "Region",   
+    GICS_SECTOR_LEVEL1 as "GICS Level 1",
+    GICS_SECTOR_LEVEL2 as "GICS Level 2",
+    GICS_SECTOR_LEVEL3 as "GICS Level 3",
+    GICS_SECTOR_LEVEL4  as "GICS Level 4",
+    ASSET_CLASS_LEVEL1 as "Asset Class Level 1",
+    ASSET_CLASS_LEVEL2 as "Asset Class Level 2",
+    ASSET_CLASS_LEVEL3 as "Asset Class Level 3",
     ISSUER_NAME as "Issuer",
-    Quantity,
-    Price,
-    Market_Value,
-    Portfolio_Value,
+    Quantity as "Quantity",
+    Price as "Price",
+    Market_Value as "Market Value",
+    Portfolio_Value as "Total Portfolio Value",
     Portfolio_Weight as "Weight",
     LOOKTHROUGH as "Lookthrough",
     LOOKTHROUGH_PORTFOLIO as ETF_PORT_ID
@@ -97,16 +98,30 @@ with tab1:
     streamlit.dataframe(df, use_container_width=True)
 
 with tab2:
-    streamlit.header("Asset Type breakdown")
+    # streamlit.header("Asset Type breakdown")
     asset_col1, asset_col2 = streamlit.columns(2)
+    assetclass_agg = df[["Code","Asset Class Level 1", "Asset Class Level 2", "Asset Class Level 3", "Weight", "Market Value" ]]
+    agg_ass = assetclass_agg.groupby(["Code","Asset Class Level 1", "Asset Class Level 2", "Asset Class Level 3"]).sum()
 
     with asset_col1:
-        streamlit.subheader('Some Selection Criteria')
+        streamlit.subheader('Weight By Asset Class')
         # Some distinct set of countries from the database.
+        streamlit.dataframe(agg_ass, use_container_width=True)
 
     with asset_col2:
-        streamlit.subheader('Some Result set')
-        streamlit.bar_chart({"data": [1, 5, 2, 6, 2, 1]})
+        # streamlit.subheader('Some Result set')
+        streamlit.write(agg_ass.columns)
+
+        chart_data = pd.DataFrame(
+            {
+                "col1": list(range(20)) * 3,
+                "col2": np.random.randn(60),
+                "col3": ["A"] * 20 + ["B"] * 20 + ["C"] * 20,
+            }
+        )
+
+        streamlit.bar_chart(chart_data, x="col1", y="col2", color="col3")
+        # streamlit.bar_chart(agg_ass, x="Code", y="Market Value", color="Weight")
 
 
 with tab3:
