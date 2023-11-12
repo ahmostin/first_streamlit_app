@@ -26,15 +26,17 @@ df = snow.query(stmt)
 with streamlit.sidebar:
     image = Image.open('images/cutter-associates-logo.webp')
     streamlit.image(image, width=100)
-    streamlit.markdown("""---""")
+    streamlit.divider()
 
+    # TODO default to current system effective date.
     selected_date = streamlit.selectbox(
         'Effective Date',
         (df),
         # ('2023/09/30', '2023/10/30', '2023/11/30'),
-        index=None,
+        index=0,
         placeholder="Select Effective Date..."
     )
+
     options = streamlit.multiselect(
         'Select Portfolios',
         # ['HAXJ', 'USEQ', 'GDAP','GLBD'],
@@ -42,11 +44,11 @@ with streamlit.sidebar:
         placeholder="Select Portfolio..."
     )
     # lookthrough = streamlit.checkbox('Holdings Look through',help='tooltip_text')
-    lookthrough = streamlit.toggle('Account Lookthrough')
+    lookthrough = streamlit.toggle('Account Lookthrough', help='Something')
 
-    streamlit.markdown("""---""")
-    image = Image.open('images/snowflake.png')
-    streamlit.image(image, width=200)
+    streamlit.divider()
+    # image = Image.open('images/snowflake.png')
+    # streamlit.image(image, width=200)
 
 in_str = '('
 for opt in options:
@@ -88,9 +90,9 @@ df = snow.query(stmt)
 
 streamlit.subheader('Holdings Lookthrough: 2023/09/30, Portfolios: ' + in_str)
 
-tab1, tab2, tab3, tab4 = streamlit.tabs(["🗃Holdings ", "Asset Class ", "📈Exposure By Country ", "📈Exposure By Security Type"])
+tab1, tab2, tab3, tab4 = streamlit.tabs(["📀 Holdings Data ", "💲Asset Class ", "📈Exposure By Country ", "📈Exposure By Security Type"])
 with tab1:
-    streamlit.header("Portfolio Holdings")
+    # streamlit.subheader("Portfolio Holdings")
     # Display the table on the page.
     # output = df.to_pandas()
     streamlit.dataframe(df, use_container_width=True)
@@ -112,20 +114,16 @@ with tab2:
 
         chart_data = pd.DataFrame(
             {
-                # "col1": list(range(2)) * 3,
-                "col1": list(["Fund","Benchmark"]) * 3,
+                "Relative": ["Fund","Benchmark"] * 3,
                 "Weight": np.random.randn(6),
                 "Asset Class": ["Fixed Income"] * 2 + ["Equity"] * 2 + ["ETF"] * 2,
             }
         )
 
-        streamlit.bar_chart(chart_data, x="col1", y="Weight", color="Asset Class")
-        # streamlit.bar_chart(agg_ass, x="Code", y="Market Value", color="Weight")
-        streamlit.write(chart_data)
-
+        streamlit.bar_chart(chart_data, x="Relative", y="Weight", color="Asset Class")
 
 with tab3:
-    streamlit.header("Exposure")
+    streamlit.subheader("Exposure")
     ex_col1, ex_col2 = streamlit.columns(2)
 
     with ex_col1:
@@ -138,4 +136,4 @@ with tab3:
 
 
 with tab4:
-    streamlit.header("An owl")
+    streamlit.subheader("Exposure")
