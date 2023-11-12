@@ -88,14 +88,14 @@ stmt = '''select
 stmt = stmt + in_str
 df = snow.query(stmt)
 
-streamlit.subheader('Holdings Lookthrough: 2023/09/30, Portfolios: ' + in_str)
+streamlit.subheader("Portfolio: " + in_str)
+t_overview, tab2, tab3, tab4, t_data = streamlit.tabs(["Overview ", "💲Asset Class ", "📈Exposure By Country ", "📈Exposure By Security Type ", "📀 Holdings Data "])
+with t_overview:
 
-tab1, tab2, tab3, tab4 = streamlit.tabs(["📀 Holdings Data ", "💲Asset Class ", "📈Exposure By Country ", "📈Exposure By Security Type"])
-with tab1:
-    # streamlit.subheader("Portfolio Holdings")
-    # Display the table on the page.
-    # output = df.to_pandas()
-    streamlit.dataframe(df, use_container_width=True)
+    # streamlit.subheader('Holdings Lookthrough: 2023/09/30, Portfolios: ' + in_str)
+    "Total Market Value: "
+    "Benchmark: "
+
 
 with tab2:
     # streamlit.header("Asset Type breakdown")
@@ -137,3 +137,33 @@ with tab3:
 
 with tab4:
     streamlit.subheader("Exposure")
+
+with t_data:
+    # streamlit.subheader("Portfolio Holdings")
+    # Display the table on the page.
+    # output = df.to_pandas()
+    streamlit.dataframe(df, use_container_width=True, hide_index=True,)
+
+    data_df = pd.DataFrame(
+        {
+            "sales": [
+                [0, 4, 26, 80, 100, 40],
+                [80, 20, 80, 35, 40, 100],
+                [10, 20, 80, 80, 70, 0],
+                [10, 100, 20, 100, 30, 100],
+            ],
+        }
+    )
+
+    streamlit.data_editor(
+        data_df,
+        column_config={
+            "sales": streamlit.column_config.LineChartColumn(
+                "Sales (last 6 months)",
+                help="The sales volume in the last 6 months",
+                y_min=0,
+                y_max=100,
+            ),
+        },
+        hide_index=True,
+    )
