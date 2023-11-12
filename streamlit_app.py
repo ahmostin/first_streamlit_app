@@ -20,40 +20,38 @@ portfolios = get_portfolios()
 # TODO:  Generate a list of portfolios with the code & name combined.
 # need to identify if CODE can be selected based on the INDEX selected rather than the value.
 # Then populate the Portfolio selection selectbox
+stmt = "select distinct( TO_DATE( TO_CHAR( DATE_KEY) , 'YYYYMMDD') )  as Effective_Date  from DW.WIDE_HOLDINGS"
+df = snow.query(stmt)
 
-
-col1, col2 = streamlit.columns(2)
-with col1:
+with streamlit.sidebar:
     image = Image.open('images/cutter-associates-logo.webp')
     streamlit.image(image, width=100)
-
-    options = streamlit.multiselect(
-        'Select Portfolios',
-        ['HAXJ', 'USEQ', 'GDAP','GLBD'],
-        placeholder="Select Portfolio..."
-    )
-
-with col2:
-    image = Image.open('images/snowflake.png')
-    streamlit.image(image, width=200)
-
-    stmt = "select distinct( TO_DATE( TO_CHAR( DATE_KEY) , 'YYYYMMDD') )  as Effective_Date  from DW.WIDE_HOLDINGS"
-    df = snow.query(stmt)
+    streamlit.markdown("""---""")
 
     selected_date = streamlit.selectbox(
-        'Select Date',
-         (df),
+        'Effective Date',
+        (df),
         # ('2023/09/30', '2023/10/30', '2023/11/30'),
         index=None,
         placeholder="Select Effective Date..."
     )
-    lookthrough = streamlit.checkbox('Holdings Look through',help='tooltip_text')
+    options = streamlit.multiselect(
+        'Select Portfolios',
+        # ['HAXJ', 'USEQ', 'GDAP','GLBD'],
+        portfolios,
+        placeholder="Select Portfolio..."
+    )
+    # lookthrough = streamlit.checkbox('Holdings Look through',help='tooltip_text')
+    lookthrough = streamlit.toggle('Account Lookthrough')
+
+    streamlit.markdown("""---""")
+    image = Image.open('images/snowflake.png')
+    streamlit.image(image, width=200)
 
 in_str = '('
 for opt in options:
     in_str = in_str + " '" + opt + "', "
 in_str = in_str + "'')"
-
 
 # streamlit.write (in_str)
 # stmt = "select * from DW.WIDE_HOLDINGS where DATE_KEY = 20230930 AND PORTFOLIO_CODE IN " + in_str
@@ -88,7 +86,7 @@ stmt = '''select
 stmt = stmt + in_str
 df = snow.query(stmt)
 
-#streamlit.subheader('Holdings Lookthrough: 2023/09/30, Portfolios: ' + in_str)
+streamlit.subheader('Holdings Lookthrough: 2023/09/30, Portfolios: ' + in_str)
 
 tab1, tab2, tab3, tab4 = streamlit.tabs(["🗃Holdings ", "Asset Class ", "📈Exposure By Country ", "📈Exposure By Security Type"])
 with tab1:
@@ -110,18 +108,20 @@ with tab2:
 
     with asset_col2:
         # streamlit.subheader('Some Result set')
-        streamlit.write(agg_ass.columns)
+        # streamlit.write(agg_ass.columns)
 
         chart_data = pd.DataFrame(
             {
-                "col1": list(range(20)) * 3,
-                "col2": np.random.randn(60),
-                "col3": ["A"] * 20 + ["B"] * 20 + ["C"] * 20,
+                # "col1": list(range(2)) * 3,
+                "col1": list(["Fund","Benchmark"]) * 3,
+                "Weight": np.random.randn(6),
+                "Asset Class": ["Fixed Income"] * 2 + ["Equity"] * 2 + ["ETF"] * 2,
             }
         )
 
-        streamlit.bar_chart(chart_data, x="col1", y="col2", color="col3")
+        streamlit.bar_chart(chart_data, x="col1", y="Weight", color="Asset Class")
         # streamlit.bar_chart(agg_ass, x="Code", y="Market Value", color="Weight")
+        streamlit.write(chart_data)
 
 
 with tab3:
