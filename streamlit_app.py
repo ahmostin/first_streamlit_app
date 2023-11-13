@@ -5,6 +5,7 @@ from snowflake.snowpark import Session
 import numpy as np
 from PIL import Image
 import altair as alt
+import datetime as dt
 
 streamlit.set_page_config(
     page_title="Cutter Portfolio Analytics",
@@ -36,9 +37,6 @@ def get_portfolios():
 
 portfolios = get_portfolios()
 
-# TODO:  Generate a list of portfolios with the code & name combined.
-# need to identify if CODE can be selected based on the INDEX selected rather than the value.
-# Then populate the Portfolio selection selectbox
 stmt = "select distinct( TO_DATE( TO_CHAR( DATE_KEY) , 'YYYYMMDD') )  as Effective_Date  from DW.WIDE_HOLDINGS"
 df = get_snow().query(stmt)
 
@@ -105,7 +103,10 @@ stmt = '''select
     Portfolio_Weight as "Weight",
     LOOKTHROUGH as "Lookthrough",
     LOOKTHROUGH_PORTFOLIO as ETF_PORT_ID
-    from DW.WIDE_HOLDINGS where DATE_KEY = 20230930 AND PORTFOLIO_CODE IN '''
+    from DW.WIDE_HOLDINGS where DATE_KEY ='''
+
+stmt = stmt + "'" + selected_date.strftime("%Y%m%d") + "' AND PORTFOLIO_CODE IN "
+
 stmt = stmt + "('" + portfolio_id + "')"
 if lookthrough != True:
     stmt = stmt + " AND LOOKTHROUGH = 'N'"
@@ -114,10 +115,12 @@ else:
 
 df = get_snow().query(stmt)
 
-benchmark_df = get_snow().query("select * from DW.BENCHMARK_CONSTITUENTS WHERE benchmark_code= '" + portfolio_df['BENCHMARK_CODE'].values[0]  + "'")
+benchmark_df = get_snow().query("select * from DW.BENCHMARK_CONSTITUENTS WHERE benchmark_code= '" + portfolio_df['BENCHMARK_CODE'].values[0]  + "'"  + " AND DATE_KEY = '" + selected_date.strftime("%Y%m%d") + "'")
+performance_df = get_snow().query("select * from DW.PERFORMANCE_RETURN where portfolio_code = '" + portfolio_id  + "' AND DATE_KEY = '" + selected_date.strftime("%Y%m%d") +"'")
 
-streamlit.subheader("Portfolio: " + portfolio + " (" + portfolio_id + ")")
-t_overview, tab2, tab3, tab4,t_exposure, t_data, benchmark_tab = streamlit.tabs(["Overview ", "💲Asset Allocation ", "📈Performance ", "📈Attribution ", "Exposures ", "📀 Holdings Data ", " Benchmark Data "])
+streamlit.subheader("Portfolio: " + portfolio + " (" + portfolio_id + "), Effective Date: " +  str(selected_date) )
+t_overview, t_asset, t_perf, t_attr ,t_exposure, t_data, benchmark_tab, performance_tab = streamlit.tabs(["Overview ", " Asset Allocation ", "📈Performance ", "📈Attribution ", "Exposures ", " Holdings Data ", " Benchmark Data ", " Performance Data "])
+
 with t_overview:
     overview_1, overview_2 = streamlit.columns(2)
     streamlit.markdown("""
@@ -140,7 +143,7 @@ with t_overview:
 
         with value_col:
             portfolio_df['PORTFOLIO_GROUP'].values[0]
-            portfolio_df['BENCHMARK_CODE'].values[0]
+            portfolio_df['BENCHMARK_NAME'].values[0]
             dval = portfolio_df['INCEPTION_DATE'].values[0].strftime("%m/%d/%Y")
             dval
             val = str(portfolio_df['MARKET_CAP'].values[0])
@@ -148,8 +151,31 @@ with t_overview:
             portfolio_df['BASE_CURRENCY'].values[0]
 
         streamlit.divider()
-        "Investment Objective"
-        "Market Review"
+        streamlit.subheader("Investment Objective")
+
+        "Lorem ipsum dolor sit amet, labitur alienum honestatis mei eu, quo sint veritus suscipiantur et. Vis ut erat reque iisque, pro eros prima delicatissimi ea, cu nec saepe disputationi. At eum nostrum nominati."
+
+        streamlit.subheader("Market Review")
+        streamlit.markdown('''
+* Lorem ipsum dolor sit amet, labitur alienum honestatis mei eu, quo sint veritus suscipiantur et. 
+* Vis ut erat reque iisque, pro eros prima delicatissimi ea, cu nec saepe disputationi. At eum nostrum nominati. 
+        ''')
+
+        streamlit.subheader("Performance")
+        streamlit.markdown('''
+* Mea falli equidem dignissim ex. Recteque rationibus qui an, an usu nihil tation detraxit. Est aeque altera graeci ei, pri velit numquam ex. 
+* Quot possim feugiat ex his, cibo oblique antiopam sed id, est ne libris.
+* Vix elaboraret percipitur et, ad vix fugit vivendo oporteat, ei sea viderer feugiat recusabo. 
+
+        ''')
+
+        streamlit.subheader("Outlook")
+        streamlit.markdown('''
+* Lorem ipsum dolor sit amet, labitur alienum honestatis mei eu, quo sint.
+* Vis ut erat reque iisque, pro eros prima delicatissimi ea, cu nec saepe disputationi. At eum nostrum nominati. 
+* Cum ei timeam eleifend. Has ei vivendo delectus concludaturque. Usu solum iuvaret ea. Pro luptatum periculis cu, ius at error causae. 
+        ''')
+
 
     with overview_2:
         holdings_by_asset = df[['Asset Class Level 1','Weight']]
@@ -191,43 +217,36 @@ with t_overview:
         echarts.st_echarts(
             options=chart_option, height="400px",
         )
+        m_df = performance_df[ performance_df['PERFORMANCE_RETURN_TYPE_NAME'].str.contains('Net C')][["PERFORMANCE_ENTITY_TYPE",'RETURN_1M', 'RETURN_3M', 'RETURN_6M', 'RETURN_YTD', 'RETURN_1Y', 'RETURN_3Y','RETURN_5Y','RETURN_10Y','RETURN_SI']].melt( id_vars=['PERFORMANCE_ENTITY_TYPE'] )
 
-        "Annualized Performance"
-        chart_data = pd.DataFrame(
-            {
-                "Year": ['2023','2024','2025','2026','2027'] * 2,
-                "Relative": ["Fund","Benchmark"] * 5,
-                "Value": np.random.rand(10),
-            }
-        )
-
-        chart = alt.Chart(chart_data).mark_bar().encode(
-            column=alt.Column('Year'),
-            x=alt.X('Relative').title(''),
-            y=alt.Y('Value').title('Market Value ($M)'),
-            # color=alt.Color('Relative', scale=alt.Scale(range=['#EA98D2', '#659CCA']))
-            color=alt.Color('Relative')
+        chart = alt.Chart(m_df).mark_bar().encode(
+            column=alt.Column('variable' ).title('Net Cumulative Performance'),
+            x=alt.X('PERFORMANCE_ENTITY_TYPE').title(''),
+            y=alt.Y('value').title('Market Value ($M)'),
+            color=alt.Color('PERFORMANCE_ENTITY_TYPE')
         )
         streamlit.altair_chart(chart)
 
-with tab2:
+
+with t_asset:
     # streamlit.header("Asset Type breakdown")
     asset_col1, asset_col2 = streamlit.columns(2)
     assetclass_agg = df[["Code","Asset Class Level 1", "Asset Class Level 2", "Asset Class Level 3", "Weight", "Market Value" ]]
     agg_ass = assetclass_agg.groupby(["Code","Asset Class Level 1", "Asset Class Level 2", "Asset Class Level 3"]).sum()
 
     with asset_col1:
-        # streamlit.subheader('Weight By Asset Class')
-        # Some distinct set of countries from the database.
-        # streamlit.dataframe(agg_ass, use_container_width=True)
-
         streamlit.subheader("Sector Exposure (by Weight)")
         top_holdings_df = df.copy()
         top_holdings_df = top_holdings_df[["GICS Level 1", "Weight"]].groupby(["GICS Level 1"]).sum()
 
-        # streamlit.dataframe(top_holdings_df)
         streamlit.bar_chart(top_holdings_df.sort_values('Weight', ascending=False), y="Weight", height=500)
 
+        chart_data = pd.DataFrame([[20, 30, 50], [50, 20, 30], [50, 30, 20]],
+                                  columns=['Equities EMEA', 'Equities Global', 'Equities Switzerland'],
+                                  index=[dt.datetime(2017, 1, 1),
+                                         dt.datetime(2018, 1, 2),
+                                         dt.datetime(2019, 1, 3)])
+        streamlit.area_chart(chart_data)
 
     with asset_col2:
         # Group by security ID to sum weight & value then get top largest holdings by size
@@ -237,30 +256,50 @@ with tab2:
         streamlit.subheader("Top 10 Issuers")
         streamlit.dataframe(top_holdings_df.sort_values('Market Value', ascending=False).head(10))
 
-        # chart_data = pd.DataFrame(
-        #     {
-        #         "Relative": ["Fund","Benchmark"] * 3,
-        #         "Weight": np.random.randn(6),
-        #         "Asset Class": ["Fixed Income"] * 2 + ["Equity"] * 2 + ["ETF"] * 2,
-        #     }
-        # )
-        #
-        # streamlit.bar_chart(chart_data, x="Relative", y="Weight", color="Asset Class")
-
-with tab3:
-    streamlit.subheader("Exposure")
+with t_perf:
     ex_col1, ex_col2 = streamlit.columns(2)
 
     with ex_col1:
-        streamlit.subheader('Some Selection Criteria')
-        # Some distinct set of countries from the database.
+        streamlit.subheader('Net Cumulative Performance')
+        # streamlit.line_chart( performance_df[["", "", ""]] )
+        m_df = performance_df[ performance_df['PERFORMANCE_RETURN_TYPE_NAME'].str.contains('Net C')][["PERFORMANCE_ENTITY_TYPE",'RETURN_1M', 'RETURN_3M', 'RETURN_6M', 'RETURN_YTD', 'RETURN_1Y', 'RETURN_3Y','RETURN_5Y','RETURN_10Y','RETURN_SI']].melt( id_vars=['PERFORMANCE_ENTITY_TYPE'] )
+
+        chart = alt.Chart(m_df).mark_bar().encode(
+            column=alt.Column('variable' ).title('Period'),
+            x=alt.X('PERFORMANCE_ENTITY_TYPE').title(''),
+            y=alt.Y('value').title('Market Value ($M)'),
+            color=alt.Color('PERFORMANCE_ENTITY_TYPE')
+        )
+        streamlit.altair_chart(chart)
+
+        streamlit.subheader('Net Accrued Mid Day Performance')
+        # streamlit.line_chart( performance_df[["", "", ""]] )
+        m_df = performance_df[ performance_df['PERFORMANCE_RETURN_TYPE_NAME'].str.contains('Net A')][["PERFORMANCE_ENTITY_TYPE",'RETURN_1M', 'RETURN_3M', 'RETURN_6M', 'RETURN_YTD', 'RETURN_1Y', 'RETURN_3Y','RETURN_5Y','RETURN_10Y','RETURN_SI']].melt( id_vars=['PERFORMANCE_ENTITY_TYPE'] )
+
+        chart = alt.Chart(m_df).mark_bar().encode(
+            column=alt.Column('variable' ).title('Period'),
+            x=alt.X('PERFORMANCE_ENTITY_TYPE').title(''),
+            y=alt.Y('value').title('Market Value ($M)'),
+            color=alt.Color('PERFORMANCE_ENTITY_TYPE')
+        )
+        streamlit.altair_chart(chart)
+
 
     with ex_col2:
-        streamlit.subheader('Some Result set')
-        streamlit.bar_chart({"data": [1, 5, 2, 6, 2, 1]})
+        streamlit.subheader('Gross Annualised Arithmetic Performance')
+        # streamlit.line_chart( performance_df[["", "", ""]] )
+        m_df = performance_df[ performance_df['PERFORMANCE_RETURN_TYPE_NAME'].str.contains('Gro')][["PERFORMANCE_ENTITY_TYPE",'RETURN_1M', 'RETURN_3M', 'RETURN_6M', 'RETURN_YTD', 'RETURN_1Y', 'RETURN_3Y','RETURN_5Y','RETURN_10Y','RETURN_SI']].melt( id_vars=['PERFORMANCE_ENTITY_TYPE'] )
+
+        chart = alt.Chart(m_df).mark_bar().encode(
+            column=alt.Column('variable' ).title('Period'),
+            x=alt.X('PERFORMANCE_ENTITY_TYPE').title(''),
+            y=alt.Y('value').title('Market Value ($M)'),
+            color=alt.Color('PERFORMANCE_ENTITY_TYPE')
+        )
+        streamlit.altair_chart(chart)
 
 
-with tab4:
+with t_attr:
     streamlit.subheader("Exposure")
 
 with t_exposure:
@@ -277,34 +316,10 @@ with t_exposure:
     )
 
 with t_data:
-    # streamlit.subheader("Portfolio Holdings")
-    # Display the table on the page.
-    # output = df.to_pandas()
     streamlit.dataframe(df, use_container_width=True, hide_index=True, column_config={"Effective Date": None, "Code": None, "Name":None} )
-    # data_df = pd.DataFrame(
-    #     {
-    #         "sales": [
-    #             [0, 4, 26, 80, 100, 40],
-    #             [80, 20, 80, 35, 40, 100],
-    #             [10, 20, 80, 80, 70, 0],
-    #             [10, 100, 20, 100, 30, 100],
-    #         ],
-    #     }
-    # )
-    #
-    # streamlit.data_editor(
-    #     data_df,
-    #     column_config={
-    #         "sales": streamlit.column_config.LineChartColumn(
-    #             "Sales (last 6 months)",
-    #             help="The sales volume in the last 6 months",
-    #             y_min=0,
-    #             y_max=100,
-    #         ),
-    #     },
-    #     hide_index=True,
-    # )
-
 
 with benchmark_tab:
-    benchmark_df
+    streamlit.dataframe(benchmark_df, hide_index=True, column_config={"DATE_KEY": None})
+
+with performance_tab:
+    streamlit.dataframe(performance_df, hide_index=True, column_config={"DATE_KEY": None, "PORTFOLIO_CODE": None, "PORTFOLIO_LEGAL_NAME":None})
