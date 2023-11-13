@@ -1,9 +1,33 @@
 import streamlit
 import pandas as pd
+import streamlit_echarts as echarts
 from snowflake.snowpark import Session
 import numpy as np
 from PIL import Image
-streamlit.set_page_config(page_title="Portfolio Viewer",layout="wide")
+import altair as alt
+
+streamlit.set_page_config(
+    page_title="Cutter Portfolio Analytics",
+    page_icon="🧊",
+    layout="wide",
+    initial_sidebar_state="expanded",
+    menu_items={
+        'Get Help': 'https://www.extremelycoolapp.com/help',
+        'Report a bug': "https://www.extremelycoolapp.com/bug",
+        'About':
+''' ### Portfolio Analytics Viewer     
+    * [Data glossary](https://purview.microsoft.com)
+    * [Snowflake](https://pejhwwn-lt54429.snowflakecomputing.com)
+    * [Power BI]())
+    * [Coalese.io]()
+    * [DBT Cloud]()
+    
+    > Copyright (c) Cutter Associates 2023.
+    
+'''
+
+    }
+)
 
 #@streamlit.cache_resource
 def get_snow():
@@ -17,6 +41,7 @@ def get_portfolios():
     return snow.query(stmt)
 
 portfolios = get_portfolios()
+
 # TODO:  Generate a list of portfolios with the code & name combined.
 # need to identify if CODE can be selected based on the INDEX selected rather than the value.
 # Then populate the Portfolio selection selectbox
@@ -37,26 +62,22 @@ with streamlit.sidebar:
         placeholder="Select Effective Date..."
     )
 
-    options = streamlit.multiselect(
+    portfolio = streamlit.selectbox(
         'Select Portfolios',
-        # ['HAXJ', 'USEQ', 'GDAP','GLBD'],
-        portfolios,
+        (portfolios['NAME']),
         placeholder="Select Portfolio..."
     )
+
+    idx= portfolios.index[portfolios['NAME']==portfolio].tolist()
+    portfolio_id = portfolios.loc[idx[0]]['ID']
+
     # lookthrough = streamlit.checkbox('Holdings Look through',help='tooltip_text')
-    lookthrough = streamlit.toggle('Account Lookthrough', help='Something')
+    lookthrough = streamlit.toggle('Account Lookthrough', help='When active enables looking through funds into underlying securities')
 
     streamlit.divider()
     # image = Image.open('images/snowflake.png')
     # streamlit.image(image, width=200)
 
-in_str = '('
-for opt in options:
-    in_str = in_str + " '" + opt + "', "
-in_str = in_str + "'')"
-
-# streamlit.write (in_str)
-# stmt = "select * from DW.WIDE_HOLDINGS where DATE_KEY = 20230930 AND PORTFOLIO_CODE IN " + in_str
 stmt = '''select
     TO_DATE( TO_CHAR(DATE_KEY), 'YYYYMMDD') as "Effective Date",
     PORTFOLIO_CODE as "Code",
@@ -84,18 +105,99 @@ stmt = '''select
     LOOKTHROUGH as "Lookthrough",
     LOOKTHROUGH_PORTFOLIO as ETF_PORT_ID
     from DW.WIDE_HOLDINGS where DATE_KEY = 20230930 AND PORTFOLIO_CODE IN '''
+stmt = stmt + "('" + portfolio_id + "')"
+if lookthrough != True:
+    stmt = stmt + " AND LOOKTHROUGH = 'N'"
 
-stmt = stmt + in_str
 df = snow.query(stmt)
-
-streamlit.subheader("Portfolio: " + in_str)
-t_overview, tab2, tab3, tab4, t_data = streamlit.tabs(["Overview ", "💲Asset Class ", "📈Exposure By Country ", "📈Exposure By Security Type ", "📀 Holdings Data "])
+streamlit.subheader("Portfolio: " + portfolio)
+t_overview, tab2, tab3, tab4,t_exposure, t_data = streamlit.tabs(["Overview ", "💲Asset Allocation ", "📈Performance ", "📈Attribution ", "Exposures ", "📀 Holdings Data "])
 with t_overview:
+    overview_1, overview_2 = streamlit.columns(2)
 
-    # streamlit.subheader('Holdings Lookthrough: 2023/09/30, Portfolios: ' + in_str)
-    "Total Market Value: "
-    "Benchmark: "
+    with overview_1:
+        # col1, col2, col3 = streamlit.columns(3)
+        # col1.metric("Market Value", "70 M$", "1.2 M$")
+        # col2.metric("Wind", "9 mph", "-8%")
+        # col3.metric("Humidity", "86%", "4%")
+        #
+        # streamlit.markdown("""
+        #     <style>
+        #     [data-testid=column]:nth-of-type(1) [data-testid=stVerticalBlock]{
+        #         gap: 0rem;
+        #     }
+        #     </style>
+        #     """,unsafe_allow_html=True)
+        # streamlit.divider()
 
+        "Investment Strategy: "
+        "Benchmark: "
+        "Assets Under Management: "
+        "Base Currency"
+        streamlit.divider()
+        "Investment Objective"
+
+        "Market Review"
+
+    with overview_2:
+        streamlit.markdown("""
+            <style>
+            [data-testid=column]:nth-of-type(1) [data-testid=stVerticalBlock]{
+                gap: 0rem;
+            }
+            </style>
+            """,unsafe_allow_html=True)
+        chart_option = {
+            "tooltip": {"trigger": "item"},
+            "title": {"text": "Asset Allocation", "subtext": "by Security Class", "left": "left"},
+            # "legend": {"top": "5%", "right": "center"},
+            "legend": {"orient": "vertical", "right": "right",},
+            "series": [
+                {
+                    "name": "Asset Allocation",
+                    "type": "pie",
+                    "radius": ["40%", "70%"],
+                    "avoidLabelOverlap": True,
+                    "itemStyle": {
+                        "borderRadius": 10,
+                        "borderColor": "#fff",
+                        "borderWidth": 2,
+                    },
+                    "label": {"show": False, "position": "right"},
+                    "emphasis": {
+                        "label": {"show": True, "fontSize": "25", "fontWeight": "bold"}
+                    },
+                    "labelLine": {"show": True},
+                    "data": [
+                        {"value": 1048, "name": "Equity 52.82%"},
+                        {"value": 735, "name": "Fixed Income 32.82%"},
+                        {"value": 580, "name": "Alternatives 16.82%"},
+                        {"value": 484, "name": "Cash and Equivalents 12.82%"},
+                        ],
+                    }
+                ],
+            }
+        echarts.st_echarts(
+            options=chart_option, height="500px",
+        )
+
+        "Annualized Performance"
+        chart_data = pd.DataFrame(
+            {
+                "Year": ['2023','2024','2025','2026','2027'] * 2,
+                "Relative": ["Fund","Benchmark"] * 5,
+                "Value": np.random.rand(10),
+            }
+        )
+
+        chart = alt.Chart(chart_data).mark_bar().encode(
+            column=alt.Column('Year'),
+            x=alt.X('Relative').title(''),
+            y=alt.Y('Value').title('Market Value ($M)'),
+            # color=alt.Color('Relative', scale=alt.Scale(range=['#EA98D2', '#659CCA']))
+            color=alt.Color('Relative')
+        )
+        streamlit.altair_chart(chart)
 
 with tab2:
     # streamlit.header("Asset Type breakdown")
@@ -137,6 +239,19 @@ with tab3:
 
 with tab4:
     streamlit.subheader("Exposure")
+
+with t_exposure:
+    selected_date = streamlit.selectbox(
+        'Exposure Type',
+         ('🌎 Portfolio Geographic Exposure',
+          '📈 Equity Geographic Exposure',
+          'Fixed Income Geographic Exposure',
+          'Fixed Income Exposures'
+          ),
+        index=None,
+        placeholder="Select Exposure Report...",
+        label_visibility='collapsed'
+    )
 
 with t_data:
     # streamlit.subheader("Portfolio Holdings")
