@@ -1,1 +1,6 @@
-pip install streamlit-echarts
+pandas
+streamlit
+streamlit-echarts
+snowflake-snowpark-python
+numpy
+altair
