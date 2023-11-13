@@ -1,1 +1,1 @@
-streamlit-echarts
+pip install streamlit-echarts

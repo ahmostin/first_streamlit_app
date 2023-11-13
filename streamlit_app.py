@@ -12,33 +12,27 @@ streamlit.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
     menu_items={
-        'Get Help': 'https://www.extremelycoolapp.com/help',
-        'Report a bug': "https://www.extremelycoolapp.com/bug",
-        'About':
-''' ### Portfolio Analytics Viewer     
-    * [Data glossary](https://purview.microsoft.com)
-    * [Snowflake](https://pejhwwn-lt54429.snowflakecomputing.com)
-    * [Power BI]())
-    * [Coalese.io]()
-    * [DBT Cloud]()
-    
-    > Copyright (c) Cutter Associates 2023.
-    
-'''
-
-    }
+        'About': ''' 
+### Portfolio Analytics Viewer     
+#### Project Links
+* [Data glossary](https://purview.microsoft.com)
+* [Snowflake](https://pejhwwn-lt54429.snowflakecomputing.com)
+* [Power BI]()
+* [Coalese.io](https://app.coalescesoftware.io)
+* [DBT Cloud](https://cloud.getdbt.com)
+    > Copyright (c) Cutter Associates 2023.    
+'''}
 )
 
 #@streamlit.cache_resource
 def get_snow():
     return streamlit.connection("snowflake")
 
-snow = get_snow()
 
 #@streamlit.cache_data  # 👈 Add the caching decorator
 def get_portfolios():
-    stmt = "select portfolio_code as ID, portfolio_short_name as Name from DW.DIM_PORTFOLIO"
-    return snow.query(stmt)
+    stmt = "select portfolio_code as ID, portfolio_short_name as Name from DW.DIM_PORTFOLIO where LATEST_FLAG = 'TRUE'"
+    return get_snow().query(stmt)
 
 portfolios = get_portfolios()
 
@@ -46,7 +40,7 @@ portfolios = get_portfolios()
 # need to identify if CODE can be selected based on the INDEX selected rather than the value.
 # Then populate the Portfolio selection selectbox
 stmt = "select distinct( TO_DATE( TO_CHAR( DATE_KEY) , 'YYYYMMDD') )  as Effective_Date  from DW.WIDE_HOLDINGS"
-df = snow.query(stmt)
+df = get_snow().query(stmt)
 
 with streamlit.sidebar:
     image = Image.open('images/cutter-associates-logo.webp')
@@ -57,23 +51,29 @@ with streamlit.sidebar:
     selected_date = streamlit.selectbox(
         'Effective Date',
         (df),
-        # ('2023/09/30', '2023/10/30', '2023/11/30'),
         index=0,
         placeholder="Select Effective Date..."
     )
 
     portfolio = streamlit.selectbox(
-        'Select Portfolios',
+        'Select Portfolio',
         (portfolios['NAME']),
+        # index=None,
         placeholder="Select Portfolio..."
     )
 
-    idx= portfolios.index[portfolios['NAME']==portfolio].tolist()
-    portfolio_id = portfolios.loc[idx[0]]['ID']
+    portfolio_id = ''
+    portfolio_details = ''
 
-    # lookthrough = streamlit.checkbox('Holdings Look through',help='tooltip_text')
+    if portfolio == None:
+        portfolio_id = ''
+        portfolio = ''
+    else:
+        idx= portfolios.index[portfolios['NAME']==portfolio].tolist()
+        portfolio_id = portfolios.loc[idx[0]]['ID']
+        portfolio_df = get_snow().query("select * from CUTTER_DW.DW.portfolio_analytics where portfolio_code = '" + portfolio_id  + "'")
+
     lookthrough = streamlit.toggle('Account Lookthrough', help='When active enables looking through funds into underlying securities')
-
     streamlit.divider()
     # image = Image.open('images/snowflake.png')
     # streamlit.image(image, width=200)
@@ -83,6 +83,7 @@ stmt = '''select
     PORTFOLIO_CODE as "Code",
     PORTFOLIO_LEGAL_NAME as "Name",
     SECURITY_NAME as "Security",
+    SECURITY_TYPE as "Security Type",
     TICKER as "Ticker",
     ISIN,
     CURRENCY_CODE as "Currency",
@@ -108,45 +109,60 @@ stmt = '''select
 stmt = stmt + "('" + portfolio_id + "')"
 if lookthrough != True:
     stmt = stmt + " AND LOOKTHROUGH = 'N'"
+else:
+    stmt = stmt + " AND SECURITY_TYPE <> 'Portfolio'"
 
-df = snow.query(stmt)
-streamlit.subheader("Portfolio: " + portfolio)
-t_overview, tab2, tab3, tab4,t_exposure, t_data = streamlit.tabs(["Overview ", "💲Asset Allocation ", "📈Performance ", "📈Attribution ", "Exposures ", "📀 Holdings Data "])
+df = get_snow().query(stmt)
+
+benchmark_df = get_snow().query("select * from DW.BENCHMARK_CONSTITUENTS WHERE benchmark_code= '" + portfolio_df['BENCHMARK_CODE'].values[0]  + "'")
+
+streamlit.subheader("Portfolio: " + portfolio + " (" + portfolio_id + ")")
+t_overview, tab2, tab3, tab4,t_exposure, t_data, benchmark_tab = streamlit.tabs(["Overview ", "💲Asset Allocation ", "📈Performance ", "📈Attribution ", "Exposures ", "📀 Holdings Data ", " Benchmark Data "])
 with t_overview:
     overview_1, overview_2 = streamlit.columns(2)
-
-    with overview_1:
-        # col1, col2, col3 = streamlit.columns(3)
-        # col1.metric("Market Value", "70 M$", "1.2 M$")
-        # col2.metric("Wind", "9 mph", "-8%")
-        # col3.metric("Humidity", "86%", "4%")
-        #
-        # streamlit.markdown("""
-        #     <style>
-        #     [data-testid=column]:nth-of-type(1) [data-testid=stVerticalBlock]{
-        #         gap: 0rem;
-        #     }
-        #     </style>
-        #     """,unsafe_allow_html=True)
-        # streamlit.divider()
-
-        "Investment Strategy: "
-        "Benchmark: "
-        "Assets Under Management: "
-        "Base Currency"
-        streamlit.divider()
-        "Investment Objective"
-
-        "Market Review"
-
-    with overview_2:
-        streamlit.markdown("""
+    streamlit.markdown("""
             <style>
             [data-testid=column]:nth-of-type(1) [data-testid=stVerticalBlock]{
                 gap: 0rem;
             }
             </style>
             """,unsafe_allow_html=True)
+
+    with overview_1:
+        # portfolio_df
+        label_col, value_col = streamlit.columns(2)
+        with label_col:
+            "Investment Strategy: "
+            "Benchmark: "
+            "Inception Date: "
+            "Assets Under Management: "
+            "Base Currency: "
+
+        with value_col:
+            portfolio_df['PORTFOLIO_GROUP'].values[0]
+            portfolio_df['BENCHMARK_CODE'].values[0]
+            dval = portfolio_df['INCEPTION_DATE'].values[0].strftime("%m/%d/%Y")
+            dval
+            val = str(portfolio_df['MARKET_CAP'].values[0])
+            val
+            portfolio_df['BASE_CURRENCY'].values[0]
+
+        streamlit.divider()
+        "Investment Objective"
+        "Market Review"
+
+    with overview_2:
+        holdings_by_asset = df[['Asset Class Level 1','Weight']]
+
+        # If lookthrough then exclude records with securitytype = 'portfolio' to stop double counting. (done) sum is still wrong when using lookthrough
+        totals = holdings_by_asset.groupby(['Asset Class Level 1'], as_index=False).agg({ 'Weight': 'sum'})
+        totals.loc[:, 'Weight'] = round( totals.loc[:, 'Weight'] * 100,6)
+        for index, row in totals.iterrows():
+                totals.loc[index, 'Asset Class Level 1'] = row['Asset Class Level 1'] + ' '+  str( row['Weight'])  + '%'
+
+        newdf = totals.rename(columns={'Weight': 'value', 'Asset Class Level 1': 'name'})
+        edata = newdf.to_dict('records')
+
         chart_option = {
             "tooltip": {"trigger": "item"},
             "title": {"text": "Asset Allocation", "subtext": "by Security Class", "left": "left"},
@@ -168,17 +184,12 @@ with t_overview:
                         "label": {"show": True, "fontSize": "25", "fontWeight": "bold"}
                     },
                     "labelLine": {"show": True},
-                    "data": [
-                        {"value": 1048, "name": "Equity 52.82%"},
-                        {"value": 735, "name": "Fixed Income 32.82%"},
-                        {"value": 580, "name": "Alternatives 16.82%"},
-                        {"value": 484, "name": "Cash and Equivalents 12.82%"},
-                        ],
+                     "data": edata,
                     }
                 ],
             }
         echarts.st_echarts(
-            options=chart_option, height="500px",
+            options=chart_option, height="400px",
         )
 
         "Annualized Performance"
@@ -206,23 +217,35 @@ with tab2:
     agg_ass = assetclass_agg.groupby(["Code","Asset Class Level 1", "Asset Class Level 2", "Asset Class Level 3"]).sum()
 
     with asset_col1:
-        streamlit.subheader('Weight By Asset Class')
+        # streamlit.subheader('Weight By Asset Class')
         # Some distinct set of countries from the database.
-        streamlit.dataframe(agg_ass, use_container_width=True)
+        # streamlit.dataframe(agg_ass, use_container_width=True)
+
+        streamlit.subheader("Sector Exposure (by Weight)")
+        top_holdings_df = df.copy()
+        top_holdings_df = top_holdings_df[["GICS Level 1", "Weight"]].groupby(["GICS Level 1"]).sum()
+
+        # streamlit.dataframe(top_holdings_df)
+        streamlit.bar_chart(top_holdings_df.sort_values('Weight', ascending=False), y="Weight", height=500)
+
 
     with asset_col2:
-        # streamlit.subheader('Some Result set')
-        # streamlit.write(agg_ass.columns)
+        # Group by security ID to sum weight & value then get top largest holdings by size
+        top_holdings_df = df.copy()
+        top_holdings_df = top_holdings_df[["Issuer","Market Value", "Weight"]].groupby(["Issuer"]).sum()
 
-        chart_data = pd.DataFrame(
-            {
-                "Relative": ["Fund","Benchmark"] * 3,
-                "Weight": np.random.randn(6),
-                "Asset Class": ["Fixed Income"] * 2 + ["Equity"] * 2 + ["ETF"] * 2,
-            }
-        )
+        streamlit.subheader("Top 10 Issuers")
+        streamlit.dataframe(top_holdings_df.sort_values('Market Value', ascending=False).head(10))
 
-        streamlit.bar_chart(chart_data, x="Relative", y="Weight", color="Asset Class")
+        # chart_data = pd.DataFrame(
+        #     {
+        #         "Relative": ["Fund","Benchmark"] * 3,
+        #         "Weight": np.random.randn(6),
+        #         "Asset Class": ["Fixed Income"] * 2 + ["Equity"] * 2 + ["ETF"] * 2,
+        #     }
+        # )
+        #
+        # streamlit.bar_chart(chart_data, x="Relative", y="Weight", color="Asset Class")
 
 with tab3:
     streamlit.subheader("Exposure")
@@ -257,28 +280,31 @@ with t_data:
     # streamlit.subheader("Portfolio Holdings")
     # Display the table on the page.
     # output = df.to_pandas()
-    streamlit.dataframe(df, use_container_width=True, hide_index=True,)
+    streamlit.dataframe(df, use_container_width=True, hide_index=True, column_config={"Effective Date": None, "Code": None, "Name":None} )
+    # data_df = pd.DataFrame(
+    #     {
+    #         "sales": [
+    #             [0, 4, 26, 80, 100, 40],
+    #             [80, 20, 80, 35, 40, 100],
+    #             [10, 20, 80, 80, 70, 0],
+    #             [10, 100, 20, 100, 30, 100],
+    #         ],
+    #     }
+    # )
+    #
+    # streamlit.data_editor(
+    #     data_df,
+    #     column_config={
+    #         "sales": streamlit.column_config.LineChartColumn(
+    #             "Sales (last 6 months)",
+    #             help="The sales volume in the last 6 months",
+    #             y_min=0,
+    #             y_max=100,
+    #         ),
+    #     },
+    #     hide_index=True,
+    # )
 
-    data_df = pd.DataFrame(
-        {
-            "sales": [
-                [0, 4, 26, 80, 100, 40],
-                [80, 20, 80, 35, 40, 100],
-                [10, 20, 80, 80, 70, 0],
-                [10, 100, 20, 100, 30, 100],
-            ],
-        }
-    )
 
-    streamlit.data_editor(
-        data_df,
-        column_config={
-            "sales": streamlit.column_config.LineChartColumn(
-                "Sales (last 6 months)",
-                help="The sales volume in the last 6 months",
-                y_min=0,
-                y_max=100,
-            ),
-        },
-        hide_index=True,
-    )
+with benchmark_tab:
+    benchmark_df
