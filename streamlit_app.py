@@ -119,7 +119,10 @@ benchmark_df = get_snow().query("select * from DW.BENCHMARK_CONSTITUENTS WHERE b
 performance_df = get_snow().query("select * from DW.PERFORMANCE_RETURN where portfolio_code = '" + portfolio_id  + "' AND DATE_KEY = '" + selected_date.strftime("%Y%m%d") +"'")
 
 streamlit.subheader("Portfolio: " + portfolio + " (" + portfolio_id + "), Effective Date: " +  str(selected_date) )
-t_overview, t_asset, t_perf, t_attr ,t_exposure, t_data, benchmark_tab, performance_tab = streamlit.tabs(["Overview ", " Asset Allocation ", "📈Performance ", "📈Attribution ", "Exposures ", " Holdings Data ", " Benchmark Data ", " Performance Data "])
+# t_overview, t_asset, t_perf, t_attr ,t_exposure, t_data, benchmark_tab, performance_tab = streamlit.tabs(["Overview ", " Asset Allocation ", "📈Performance ", "📈Attribution ", "Exposures ", " Holdings Data ", " Benchmark Data ", " Performance Data "])
+
+t_overview, t_asset, t_perf,  t_data, benchmark_tab, performance_tab = streamlit.tabs(["Overview ", " Asset Allocation ", "Performance ",  " Holdings Data ", " Benchmark Data ", " Performance Data "])
+
 
 with t_overview:
     overview_1, overview_2 = streamlit.columns(2)
@@ -249,12 +252,29 @@ with t_asset:
         streamlit.area_chart(chart_data)
 
     with asset_col2:
-        # Group by security ID to sum weight & value then get top largest holdings by size
-        top_holdings_df = df.copy()
-        top_holdings_df = top_holdings_df[["Issuer","Market Value", "Weight"]].groupby(["Issuer"]).sum()
+        asset_col1, asset_col2 = streamlit.columns(2)
+        with asset_col1:
+            # Group by security ID to sum weight & value then get top largest holdings by size
+            top_holdings_df = df.copy()
+            top_holdings_df = top_holdings_df[["Issuer","Market Value", "Weight"]].groupby(["Issuer"]).sum()
 
-        streamlit.subheader("Top 10 Issuers")
-        streamlit.dataframe(top_holdings_df.sort_values('Market Value', ascending=False).head(10))
+            streamlit.subheader("Top 10 Issuers")
+            streamlit.dataframe(top_holdings_df.sort_values('Market Value', ascending=False).head(10))
+
+        with asset_col2:
+            top_holdings_df = df.copy()
+            top_holdings_df = top_holdings_df[["Region","Market Value", "Weight"]].groupby(["Region"]).sum()
+
+            streamlit.subheader("Top 10 Region")
+            streamlit.dataframe(top_holdings_df.sort_values('Market Value', ascending=False).head(10))
+
+            top_holdings_df = df.copy()
+            top_holdings_df = top_holdings_df[["Currency","Market Value", "Weight"]].groupby(["Currency"]).sum()
+
+            streamlit.subheader("Top 10 Currencies")
+            streamlit.dataframe(top_holdings_df.sort_values('Market Value', ascending=False).head(10))
+
+
 
 with t_perf:
     ex_col1, ex_col2 = streamlit.columns(2)
@@ -299,22 +319,22 @@ with t_perf:
         streamlit.altair_chart(chart)
 
 
-with t_attr:
-    streamlit.subheader("Exposure")
-
-with t_exposure:
-    selected_date = streamlit.selectbox(
-        'Exposure Type',
-         ('🌎 Portfolio Geographic Exposure',
-          '📈 Equity Geographic Exposure',
-          'Fixed Income Geographic Exposure',
-          'Fixed Income Exposures'
-          ),
-        index=None,
-        placeholder="Select Exposure Report...",
-        label_visibility='collapsed'
-    )
-
+# with t_attr:
+#     streamlit.subheader("Exposure")
+#
+# with t_exposure:
+#     selected_date = streamlit.selectbox(
+#         'Exposure Type',
+#          ('🌎 Portfolio Geographic Exposure',
+#           '📈 Equity Geographic Exposure',
+#           'Fixed Income Geographic Exposure',
+#           'Fixed Income Exposures'
+#           ),
+#         index=None,
+#         placeholder="Select Exposure Report...",
+#         label_visibility='collapsed'
+#     )
+#
 with t_data:
     streamlit.dataframe(df, use_container_width=True, hide_index=True, column_config={"Effective Date": None, "Code": None, "Name":None} )
 
