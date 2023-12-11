@@ -4,3 +4,5 @@ streamlit-echarts
 snowflake-snowpark-python
 numpy
 altair
+streamlit-tree-select
+streamlit-extras
